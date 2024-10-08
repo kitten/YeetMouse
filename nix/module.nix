@@ -1,4 +1,4 @@
-{ shortRev ? "dev" }:
+yeetmouseOverlay:
 { pkgs, config, lib, ... }:
 
 with lib;
@@ -90,9 +90,7 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    nixpkgs.overlays = [
-      (import ./overlay.nix { inherit shortRev; })
-    ];
+    nixpkgs.overlays = [ yeetmouseOverlay ];
 
     boot.extraModulePackages = [ pkgs.yeetmouse ];
     environment.systemPackages = [ pkgs.yeetmouse ];

@@ -9,10 +9,13 @@
     inherit (inputs.nixpkgs) lib;
     packageInputs = { inherit (self) shortRev; };
     eachSystem = lib.genAttrs ["aarch64-linux" "x86_64-linux"];
+    overlay = final: prev: {
+      yeetmouse = import ./package.nix packageInputs final;
+    };
   in {
     inherit inputs;
-    nixosModules.default = import ./module.nix packageInputs;
-    overlays.default = import ./overlay.nix packageInputs;
+    nixosModules.default = import ./module.nix overlay;
+    overlays.default = overlay;
     packages = eachSystem (system: {
       yeetmouse = (import ./package.nix packageInputs nixpkgs.legacyPackages.${system});
     });
