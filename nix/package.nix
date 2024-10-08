@@ -33,6 +33,8 @@ stdenv.mkDerivation rec {
 
   preBuild = ''
     cp $sourceRoot/driver/config.sample.h $sourceRoot/driver/config.h
+    substituteInPlace $sourceRoot/driver/config.h \
+      --replace "#define BUFFER_SIZE 16" "#define BUFFER_SIZE 32"
   '';
 
   LD_LIBRARY_PATH = "/run/opengl-driver/lib:${lib.makeLibraryPath buildInputs}";
