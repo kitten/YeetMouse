@@ -71,7 +71,6 @@ static int create_virtual_device(void) {
 static bool usb_mouse_filter(struct input_handle *handle, u32 type, u32 code, int value) {
   switch (type) {
     case EV_REL: {
-      printk("LEETMOUSE: EV_REL => code %d, value %d", code, value);
       relative_axis_events[code] = value;
       return true; // skip unaccelerated mouse input.
     }
@@ -80,7 +79,6 @@ static bool usb_mouse_filter(struct input_handle *handle, u32 type, u32 code, in
       int y = relative_axis_events[REL_Y];
       int wheel = relative_axis_events[REL_WHEEL];
       if (x || y || wheel) {
-        printk("LEETMOUSE: EV_SYN => code %d", code);
 
         if (!accelerate(&x, &y, &wheel)) {
           input_report_rel(virtual_input_dev, REL_X, x);
