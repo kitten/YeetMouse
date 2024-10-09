@@ -75,6 +75,10 @@ let
       };
     };
   };
+
+  yeetmouse = pkgs.yeetmouse.override {
+    kernel = config.boot.kernelPackages.kernel;
+  };
 in {
   options.hardware.yeetmouse = {
     enable = lib.mkOption {
@@ -92,10 +96,10 @@ in {
   config = lib.mkIf cfg.enable {
     nixpkgs.overlays = [ yeetmouseOverlay ];
 
-    boot.extraModulePackages = [ pkgs.yeetmouse ];
-    environment.systemPackages = [ pkgs.yeetmouse ];
+    boot.extraModulePackages = [ yeetmouse ];
+    environment.systemPackages = [ yeetmouse ];
     services.udev = {
-      packages = [ pkgs.yeetmouse ];
+      packages = [ yeetmouse ];
       extraRules = let
         echo = "${pkgs.coreutils}/bin/echo";
         yeetmouseConfig = with cfg.parameters; pkgs.writeShellScriptBin "yeetmouseConfig" ''
