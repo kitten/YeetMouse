@@ -83,9 +83,15 @@ static bool usb_mouse_filter(struct input_handle *handle, u32 type, u32 code, in
         printk("LEETMOUSE: EV_SYN => code %d", code);
 
         if (!accelerate(&x, &y, &wheel)) {
-          input_report_rel(virtual_input_dev, REL_X, x);
-          input_report_rel(virtual_input_dev, REL_Y, y);
-          input_report_rel(virtual_input_dev, REL_WHEEL, wheel);
+          if (x) {
+            input_report_rel(virtual_input_dev, REL_X, x);
+          }
+          if (y) {
+            input_report_rel(virtual_input_dev, REL_Y, y);
+          }
+          if (wheel) {
+            input_report_rel(virtual_input_dev, REL_WHEEL, wheel);
+          }
         }
 
         relative_axis_events[REL_X] = NONE_EVENT_VALUE;
