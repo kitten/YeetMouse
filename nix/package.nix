@@ -21,8 +21,11 @@ let
     };
 
     setSourceRoot = "export sourceRoot=$(pwd)/source";
-    nativeBuildInputs = kernel.moduleBuildDependencies ++ [ pkgs.makeWrapper ];
-    buildInputs = [ pkgs.glfw3 ];
+    nativeBuildInputs = kernel.moduleBuildDependencies ++ [ pkgs.makeWrapper pkgs.autoPatchelfHook ];
+    buildInputs = [
+      stdenv.cc.cc.lib
+      pkgs.glfw3
+    ];
 
     makeFlags = kernel.makeFlags ++ [
       "-C"
