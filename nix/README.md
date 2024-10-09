@@ -98,16 +98,18 @@ needs to be done manually. Check the `module.nix` if you're unsure of how to use
 manually.
 
 ```nix
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 
-{
+let
+  yeetmouse = pkgs.yeetmouse.override { inherit (config.boot.kernelPackages) kernel; };
+in {
   # This installs the yeetmouse kernel module:
-  boot.extraModulePackages = [ pkgs.yeetmouse ];
+  boot.extraModulePackages = [ yeetmouse ];
   # This installs the yeetmouse GUI CLI package:
-  environment.systemPackages = [ pkgs.yeetmouse ];
+  environment.systemPackages = [ yeetmouse ];
   services.udev = {
     # This installs the yeetmouse udev rules:
-    packages = [ pkgs.yeetmouse ];
+    packages = [ yeetmouse ];
 
     # You may define a custom udev rule to apply default settings to the yeetmouse driver:
     extraRules = let
@@ -122,6 +124,11 @@ manually.
   };
 }
 ```
+
+Since the `pkgs.yeetmouse` package contains a kernel module, it'll be built against a specific version
+of the Linux kernel. By default this will be `pkgs.linxPackages.kernel` - the default version in nixpkgs.
+To override this, `.override { inherit (config.boot.kernelPackages) kernel; }` is called in the example
+above to use the selected kernel for your NixOS system instead.
 
 ## Flake Builds
 
