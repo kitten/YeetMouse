@@ -50,15 +50,6 @@ let
 
     postInstall = ''
       install -Dm755 $sourceRoot/gui/YeetMouseGui $out/bin/yeetmouse
-      install -D $src/install_files/udev/99-leetmouse.rules $out/lib/udev/rules.d/98-leetmouse.rules
-      install -Dm755 $src/install_files/udev/leetmouse_bind $out/lib/udev/rules.d/leetmouse_bind
-      substituteInPlace $out/lib/udev/rules.d/98-leetmouse.rules \
-        --replace "PATH='/sbin:/bin:/usr/sbin:/usr/bin'" ""
-      patchShebangs $out/lib/udev/rules.d/leetmouse_bind
-      wrapProgram $out/lib/udev/rules.d/leetmouse_bind \
-        --prefix PATH : ${lib.makeBinPath [ bash coreutils ]}
-      substituteInPlace $out/lib/udev/rules.d/98-leetmouse.rules \
-        --replace "leetmouse_bind" "$out/lib/udev/rules.d/leetmouse_bind"
     '';
 
     buildFlags = [ "modules" ];
