@@ -85,7 +85,10 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
       case REL_WHEEL:
         v_wheel = v;
         break;
-      } /* TODO: What if we get duplicate events before a SYN? */
+      }
+      /* TODO: What if we get duplicate events before a SYN?
+       * It should, in theory, be possible to protect ourselves from this.
+       * However, since `accelerate` is stateful, that's currently not a good idea. */
     }
   }
 
