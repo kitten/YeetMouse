@@ -12,6 +12,12 @@
 
 #define NONE_EVENT_VALUE 0
 
+struct mouse_state {
+  int x;
+  int y;
+  int wheel;
+};
+
 /* Applies new values to events, filtering out zeroed values */
 INLINE unsigned int input_update_events(
   struct input_value* vals,
@@ -50,57 +56,55 @@ INLINE unsigned int input_update_events(
 }
 
 static unsigned int driver_events(struct input_handle *handle, struct input_value *vals, unsigned int count) {
+  struct mouse_state *state = handle->private;
   struct input_dev *dev = handle->dev;
   unsigned int out_count = count;
+  struct input_value *v_syn = NULL;
   struct input_value *end = vals;
   struct input_value *v;
 
-  struct input_value *v_x = NULL;
-  struct input_value *v_y = NULL;
-  struct input_value *v_wheel = NULL;
-  struct input_value *v_syn = NULL;
-
-  /* Find input_value for EV_REL events we're interested in and store pointers */
   for (v = vals; v != vals + count; v++) {
     if (v->type == EV_REL) {
+      /* Find input_value for EV_REL events we're interested in and store values */
       switch (v->code) {
       case REL_X:
-        v_x = v;
+        state->x = v->value;
         break;
       case REL_Y:
-        v_y = v;
+        state->y = v->value;
         break;
       case REL_WHEEL:
-        v_wheel = v;
+        state->wheel = v->value;
         break;
       }
-      /* TODO: What if we get duplicate events before a SYN?
-       * It should, in theory, be possible to protect ourselves from this.
-       * However, since `accelerate` is stateful, that's currently not a good idea. */
+    } else if (v->type == EV_SYN && v->code == SYN_REPORT) {
+      /* If we find an EV_SYN event, we store the pointer and apply acceleration next */
+      v_syn = v;
     }
   }
 
-  if (v_x != NULL || v_y != NULL || v_wheel != NULL) {
-    /* Retrieve values if any EV_REL events were found */
-    int x = NONE_EVENT_VALUE;
-    int y = NONE_EVENT_VALUE;
-    int wheel = NONE_EVENT_VALUE;
-    if (v_x != NULL)
-      x = v_x->value;
-    if (v_y != NULL)
-      y = v_y->value;
-    if (v_wheel != NULL)
-      wheel = v_wheel->value;
-    /* Attempt to apply acceleration */
+  if (v_syn != NULL) {
+    /* Retrieve to state if an EV_SYN event was found and apply acceleration */
+    int x = state->x;
+    int y = state->y;
+    int wheel = state->wheel;
     if (!accelerate(&x, &y, &wheel)) {
       out_count = input_update_events(vals, count, x, y, wheel);
       /* Apply new values to the queued (raw) events, same as above.
        * NOTE: This might (strictly speaking) not be necessary, but this way we leave
        * no trace of the unmodified values, in case another subsystem uses them. */
       dev->num_vals = input_update_events(dev->vals, dev->num_vals, x, y, wheel);
+      /* Reset state */
+      state->x = NONE_EVENT_VALUE;
+      state->y = NONE_EVENT_VALUE;
+      state->wheel = NONE_EVENT_VALUE;
     }
   }
 
+  /* NOTE: Technically, we can also stop iterating over `vals` when we find EV_SYN, apply acceleration,
+   * then restart in a loop until we reach the end of `vals` to handle multiple EV_SYN events per batch.
+   * However, that's not necessary since we can assume that all events in `vals` apply to the same moment
+   * in time. */
   return out_count;
 }
 
@@ -135,6 +139,17 @@ static int driver_connect(struct input_handler *handler, struct input_dev *dev, 
   if (!handle)
     return -ENOMEM;
 
+  state = kzalloc(sizeof(struct mouse_state), GFP_KERNEL);
+  if (!state) {
+    kfree(handle);
+    return -ENOMEM;
+  }
+
+  state->x = NONE_EVENT_VALUE;
+  state->y = NONE_EVENT_VALUE;
+  state->wheel = NONE_EVENT_VALUE;
+
+  handle->private = state;
   handle->dev = input_get_device(dev);
   handle->handler = handler;
   handle->name = "yeetmouse";
@@ -158,6 +173,7 @@ err_unregister_handle:
   input_unregister_handle(handle);
 
 err_free_mem:
+  kfree(handle->private);
   kfree(handle);
   return error;
 }
@@ -165,6 +181,7 @@ err_free_mem:
 static void driver_disconnect(struct input_handle *handle) {
   input_close_device(handle);
   input_unregister_handle(handle);
+  kfree(handle->private);
   kfree(handle);
 }
 
