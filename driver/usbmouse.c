@@ -57,12 +57,12 @@ struct usb_mouse {
     struct report_positions *data_pos;
 };
 
+/* See: https://github.com/torvalds/linux/blob/c964ced7726294d40913f2127c3f185a92cb4a41/drivers/hid/usbhid/usbmouse.c#L49-L86 */
 static void usb_mouse_irq(struct urb *urb)
 {
     struct usb_mouse *mouse = urb->context;
     signed char *data = mouse->data;
     struct input_dev *dev = mouse->dev;
-    signed int btn, x, y, wheel;                                 //Leetmouse Mod
     int status;
 
     switch (urb->status) {
@@ -72,30 +72,29 @@ static void usb_mouse_irq(struct urb *urb)
     case -ENOENT:
     case -ESHUTDOWN:
         return;
-                                                                //Leetmouse Mod BEGIN
+    /* NOTE: -EOVERFLOW; Leetmouse addition */
     case -EOVERFLOW:
         printk("LEETMOUSE: EOVERFLOW. Try to increase BUFFER_SIZE from %d to %d in 'config.h'", BUFFER_SIZE, 2*BUFFER_SIZE);
         goto resubmit;
-                                                                //Leetmouse Mod END
     /* -EPIPE:  should clear the halt */
     default:        /* error */
         goto resubmit;
     }
 
-                                                                //Leetmouse Mod BEGIN
-    if(!extract_mouse_events(data, BUFFER_SIZE, mouse->data_pos, &btn, &x, &y, &wheel)){
-        input_report_key(dev, BTN_LEFT,   btn & 0x01);
-        input_report_key(dev, BTN_RIGHT,  btn & 0x02);
-        input_report_key(dev, BTN_MIDDLE, btn & 0x04);
-        input_report_key(dev, BTN_SIDE,   btn & 0x08);
-        input_report_key(dev, BTN_EXTRA,  btn & 0x10);
-        if(!accelerate(&x,&y,&wheel)){
-            input_report_rel(dev, REL_X,     x);
-            input_report_rel(dev, REL_Y,     y);
-            input_report_rel(dev, REL_WHEEL, wheel);
-        }
+    input_report_key(dev, BTN_LEFT,   data[0] & 0x01);
+    input_report_key(dev, BTN_RIGHT,  data[0] & 0x02);
+    input_report_key(dev, BTN_MIDDLE, data[0] & 0x04);
+    input_report_key(dev, BTN_SIDE,   data[0] & 0x08);
+    input_report_key(dev, BTN_EXTRA,  data[0] & 0x10);
+    /* NOTE: Leetmouse applying acceleration */
+    signed int x = data[1];
+    signed int y = data[2];
+    signed int wheel = data[3];
+    if (!accelerate(&x, &y, &wheel)) {
+        input_report_rel(dev, REL_X,     x);
+        input_report_rel(dev, REL_Y,     y);
+        input_report_rel(dev, REL_WHEEL, wheel);
     }
-                                                                //Leetmouse Mod END
 
     input_sync(dev);
 resubmit:
@@ -141,7 +140,7 @@ static int hid_get_class_descriptor(struct usb_device *dev, int ifnum,
     return result;
 }
 
-
+/* See: https://github.com/torvalds/linux/blob/c964ced7726294d40913f2127c3f185a92cb4a41/drivers/hid/usbhid/usbmouse.c#L106-L201 */
 static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
     struct usb_device *dev = interface_to_usbdev(intf);
