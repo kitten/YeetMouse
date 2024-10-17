@@ -1,11 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
-/*
- * Copyright (c) 1999-2001 Vojtech Pavlik, USB HIDBP Mouse support
- * Copyright (c) Gnarus-G, maccel
- * This file has an input handler derived from the maccel project
- * https://github.com/Gnarus-G/maccel/blob/dedaa97/driver/input_handler.h
- */
-
 #include "accel.h"
 #include "config.h"
 #include "util.h"
@@ -18,99 +10,76 @@
 #include <linux/hid.h>
 #include <linux/version.h>
 
-#define DRIVER_VERSION "v1.6"
-#define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@ucw.cz>"
-#define DRIVER_DESC "USB HID mouse driver with acceleration (LEETMOUSE)"
-
 #define NONE_EVENT_VALUE 0
-static int relative_axis_events[REL_CNT] = {
-  /* [x, y, ..., wheel, ...] */ NONE_EVENT_VALUE
-};
 
-struct input_dev *virtual_input_dev;
+static unsigned int usb_mouse_events(struct input_handle *handle, struct input_value *vals, unsigned int count) {
+  struct input_value *end = vals;
+  struct input_value *v;
 
-// The virtual_input_dev is declared for/in the maccel_input_handler module.
-// This initializes it.
-static int create_virtual_device(void) {
-  int error;
+  struct input_value *v_x = NULL;
+  struct input_value *v_y = NULL;
+  struct input_value *v_wheel = NULL;
 
-  virtual_input_dev = input_allocate_device();
-  if (!virtual_input_dev) {
-    printk(KERN_ERR "Failed to allocate virtual input device\n");
-    return -ENOMEM;
+  /* Find input_value for EV_REL events we're interested in and store pointers */
+  for (v = vals; v != vals + count; v++) {
+    if (v->type != EV_REL)
+      continue;
+    switch (v->code) {
+    case REL_X:
+      v_x = v;
+      break;
+    case REL_Y:
+      v_y = v;
+      break;
+    case REL_WHEEL:
+      v_wheel = v;
+      break;
+    } /* TODO: What if we get duplicate events before a SYN? */
   }
 
-  virtual_input_dev->name = "Yeetmouse";
-  virtual_input_dev->id.bustype = BUS_USB;
-  virtual_input_dev->id.version = 1;
-
-  // Set the supported event types and codes for the virtual device
-  // and for some reason not setting some EV_KEY bits causes a noticeable
-  // difference in the values we operate on, leading to a different
-  // acceleration behavior than we expect.
-  set_bit(EV_KEY, virtual_input_dev->evbit);
-  set_bit(BTN_LEFT, virtual_input_dev->keybit);
-
-  set_bit(EV_REL, virtual_input_dev->evbit);
-  for (u32 code = REL_X; code < REL_CNT; code++) {
-    set_bit(code, virtual_input_dev->relbit);
-  }
-
-  error = input_register_device(virtual_input_dev);
-  if (error) {
-    printk(KERN_ERR "LEETMOUSE: Failed to register virtual input device\n");
-    input_free_device(virtual_input_dev);
-    return error;
-  }
-
-  return 0;
-}
-
-static bool usb_mouse_filter(struct input_handle *handle, u32 type, u32 code, int value) {
-  switch (type) {
-    case EV_REL: {
-      printk("LEETMOUSE: EV_REL => code %d, value %d", code, value);
-      relative_axis_events[code] = value;
-      return true; // skip unaccelerated mouse input.
-    }
-    case EV_SYN: {
-      int x = relative_axis_events[REL_X];
-      int y = relative_axis_events[REL_Y];
-      int wheel = relative_axis_events[REL_WHEEL];
-      if (x || y || wheel) {
-        printk("LEETMOUSE: EV_SYN => code %d", code);
-
-        if (!accelerate(&x, &y, &wheel)) {
-          input_report_rel(virtual_input_dev, REL_X, x);
-          input_report_rel(virtual_input_dev, REL_Y, y);
-          input_report_rel(virtual_input_dev, REL_WHEEL, wheel);
+  if (v_x != NULL || v_y != NULL || v_wheel != NULL) {
+    /* Retrieve values if any EV_REL events were found */
+    int x = NONE_EVENT_VALUE;
+    int y = NONE_EVENT_VALUE;
+    int wheel = NONE_EVENT_VALUE;
+    if (v_x != NULL)
+      x = v_x->value;
+    if (v_y != NULL)
+      y = v_y->value;
+    if (v_wheel != NULL)
+      wheel = v_wheel->value;
+    /* Attempt to apply acceleration */
+    if (!accelerate(&x, &y, &wheel)) {
+      /* If successful, apply new values to events, filtering out zeroed values */
+      for (v = vals; v != vals + count; v++) {
+        /* TODO: REL_X, REL_Y, and REL_WHEEL not matching v_* pointer should be omitted or updated */
+        if (v_x != NULL && v == v_x) {
+          if (x == NONE_EVENT_VALUE)
+            continue;
+          v->value = x;
+        } else if (v_y != NULL && v == v_y) {
+          if (y == NONE_EVENT_VALUE)
+            continue;
+          v->value = y;
+        } else if (v_wheel != NULL && v == v_wheel) {
+          if (wheel == NONE_EVENT_VALUE)
+            continue;
+          v->value = wheel;
         }
-
-        relative_axis_events[REL_X] = NONE_EVENT_VALUE;
-        relative_axis_events[REL_Y] = NONE_EVENT_VALUE;
-        relative_axis_events[REL_WHEEL] = NONE_EVENT_VALUE;
+        if (end != v)
+          *end = *v;
+        end++;
       }
-
-      for (u32 code = REL_Z; code < REL_CNT; code++) {
-        int value = relative_axis_events[code];
-        if (value != NONE_EVENT_VALUE) {
-          input_report_rel(virtual_input_dev, code, value);
-          relative_axis_events[code] = NONE_EVENT_VALUE;
-        }
-      }
-
-      input_sync(virtual_input_dev);
-
-      return false;
+      return end - vals;
     }
-
-    default:
-      return false;
   }
+
+  /* Otherwise return events unchanged */
+  return count;
 }
 
 static bool usb_mouse_match(struct input_handler *handler, struct input_dev *dev) {
-  if (dev == virtual_input_dev || !dev->dev.parent)
+  if (!dev->dev.parent)
     return false;
   struct hid_device *hdev = to_hid_device(dev->dev.parent);
   printk("LEETMOUSE: found a possible mouse %s", hdev->name);
@@ -168,28 +137,21 @@ MODULE_DEVICE_TABLE(input, usb_mouse_ids);
 struct input_handler usb_mouse_handler = {
   .name = "leetmouse",
   .id_table = usb_mouse_ids,
-  .filter = usb_mouse_filter,
+  .events = usb_mouse_events,
   .connect = usb_mouse_connect,
   .disconnect = usb_mouse_disconnect,
   .match = usb_mouse_match
 };
 
 static int __init usb_mouse_init(void) {
-  int error = create_virtual_device();
-  if (error) {
-    return error;
-  }
   return input_register_handler(&usb_mouse_handler);
 }
 
 static void __exit usb_mouse_exit(void) {
   input_unregister_handler(&usb_mouse_handler);
-  input_unregister_device(virtual_input_dev);
-  input_free_device(virtual_input_dev);
 }
 
-MODULE_AUTHOR(DRIVER_AUTHOR);
-MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_DESCRIPTION("USB HID input handler applying mouse acceleration (Yeetmouse)");
 MODULE_LICENSE("GPL");
 
 module_init(usb_mouse_init);
