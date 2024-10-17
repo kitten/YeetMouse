@@ -52,7 +52,6 @@ struct usb_mouse {
     struct urb *irq;
 
     signed char *data;
-    dma_addr_t data_dma;
 };
 
 /* See: https://github.com/torvalds/linux/blob/c964ced7726294d40913f2127c3f185a92cb4a41/drivers/hid/usbhid/usbmouse.c#L49-L86 */
@@ -130,6 +129,7 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
     struct usb_endpoint_descriptor *endpoint;
     struct usb_mouse *mouse;
     struct input_dev *input_dev;
+    struct urb *irq; // NOTE: This is now allocated separately and early
     int pipe, maxp;
     int error = -ENOMEM;
 
@@ -155,22 +155,19 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
         maxp = usb_maxpacket(dev, pipe);
     #endif
 
+    irq = usb_alloc_urb(0, GFP_KERNEL); // NOTE: The irq is now allocated earlier for `irq->transfer_dma`
     mouse = kzalloc(sizeof(struct usb_mouse), GFP_KERNEL);
-    input_dev = input_allocate_device();
-    if (!mouse || !input_dev)
-        goto fail1;
-    
-    mouse->data = usb_alloc_coherent(dev, BUFFER_SIZE, GFP_KERNEL, &mouse->data_dma);
-    if (!mouse->data)
+    if (!mouse || !irq)
         goto fail1;
 
-    mouse->irq = usb_alloc_urb(0, GFP_KERNEL);
-    mouse->irq->dev = dev; // NOTE: This is done earlier than usual. Not sure why
-    if (!mouse->irq)
+    input_dev = input_allocate_device();
+    if (!input_dev)
         goto fail2;
 
+    mouse->irq = irq;
     mouse->usbdev = dev;
     mouse->dev = input_dev;
+    irq->dev = dev; // NOTE: We now set this early instead of just in `usb_mouse_open`
 
     if (dev->manufacturer)
         strscpy(mouse->name, dev->manufacturer, sizeof(mouse->name));
@@ -208,25 +205,26 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
     input_dev->open = usb_mouse_open;
     input_dev->close = usb_mouse_close;
 
+    mouse->data = usb_alloc_coherent(dev, BUFFER_SIZE, GFP_KERNEL, &irq->transfer_dma);
+    irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+
     usb_fill_int_urb(mouse->irq, dev, pipe, mouse->data,
              (maxp > BUFFER_SIZE ? BUFFER_SIZE : maxp),
              usb_mouse_irq, mouse, endpoint->bInterval);
-    mouse->irq->transfer_dma = mouse->data_dma;
-    mouse->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
     error = input_register_device(mouse->dev);
-    if (error)
+    if (!mouse->data || error)
         goto fail3;
 
     usb_set_intfdata(intf, mouse);
     return 0;
 
-fail3:
-    usb_free_urb(mouse->irq);
-fail2:    
-    usb_free_coherent(dev, BUFFER_SIZE, mouse->data, mouse->data_dma);
-fail1:    
+fail3:    
+    usb_free_coherent(dev, BUFFER_SIZE, mouse->data, irq->transfer_dma);
+fail2:
     input_free_device(input_dev);
+fail1:
+    usb_free_urb(mouse->irq);
     kfree(mouse);
     return error;
 }
@@ -240,7 +238,7 @@ static void usb_mouse_disconnect(struct usb_interface *intf)
         usb_kill_urb(mouse->irq);
         input_unregister_device(mouse->dev);
         usb_free_urb(mouse->irq);
-        usb_free_coherent(interface_to_usbdev(intf), BUFFER_SIZE, mouse->data, mouse->data_dma);
+        usb_free_coherent(interface_to_usbdev(intf), BUFFER_SIZE, mouse->data, mouse->irq->transfer_dma);
         kfree(mouse);
     }
 }
