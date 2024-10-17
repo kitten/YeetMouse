@@ -123,6 +123,10 @@ static int usb_mouse_connect(struct input_handler *handler, struct input_dev *de
   if (error)
     goto err_unregister_handle;
 
+  error = input_grab_device(handle);
+  if (error)
+    goto err_unregister_handle;
+
   printk(pr_fmt("LEETMOUSE: connecting to device: %s (%s at %s)"), dev_name(&dev->dev), dev->name ?: "unknown", dev->phys ?: "unknown");
 
   return 0;
@@ -136,6 +140,7 @@ err_free_mem:
 }
 
 static void usb_mouse_disconnect(struct input_handle *handle) {
+  input_release_device(handle);
   input_close_device(handle);
   input_unregister_handle(handle);
   kfree(handle);
