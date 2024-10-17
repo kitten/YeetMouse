@@ -13,28 +13,33 @@
 #define NONE_EVENT_VALUE 0
 
 static unsigned int usb_mouse_events(struct input_handle *handle, struct input_value *vals, unsigned int count) {
+  struct input_dev *dev = handle->dev;
+  unsigned int out_count = count;
   struct input_value *end = vals;
   struct input_value *v;
 
   struct input_value *v_x = NULL;
   struct input_value *v_y = NULL;
   struct input_value *v_wheel = NULL;
+  struct input_value *v_syn = NULL;
 
   /* Find input_value for EV_REL events we're interested in and store pointers */
   for (v = vals; v != vals + count; v++) {
-    if (v->type != EV_REL)
-      continue;
-    switch (v->code) {
-    case REL_X:
-      v_x = v;
-      break;
-    case REL_Y:
-      v_y = v;
-      break;
-    case REL_WHEEL:
-      v_wheel = v;
-      break;
-    } /* TODO: What if we get duplicate events before a SYN? */
+    if (v->type == EV_SYN && v->code == SYN_REPORT) {
+      v_syn = v;
+    } else if (v->type == EV_REL) {
+      switch (v->code) {
+      case REL_X:
+        v_x = v;
+        break;
+      case REL_Y:
+        v_y = v;
+        break;
+      case REL_WHEEL:
+        v_wheel = v;
+        break;
+      } /* TODO: What if we get duplicate events before a SYN? */
+    }
   }
 
   if (v_x != NULL || v_y != NULL || v_wheel != NULL) {
@@ -50,32 +55,66 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
       wheel = v_wheel->value;
     /* Attempt to apply acceleration */
     if (!accelerate(&x, &y, &wheel)) {
-      /* If successful, apply new values to events, filtering out zeroed values */
+      /* Apply new values to events, filtering out zeroed values */
       for (v = vals; v != vals + count; v++) {
-        /* TODO: REL_X, REL_Y, and REL_WHEEL not matching v_* pointer should be omitted or updated */
-        if (v_x != NULL && v == v_x) {
-          if (x == NONE_EVENT_VALUE)
-            continue;
-          v->value = x;
-        } else if (v_y != NULL && v == v_y) {
-          if (y == NONE_EVENT_VALUE)
-            continue;
-          v->value = y;
-        } else if (v_wheel != NULL && v == v_wheel) {
-          if (wheel == NONE_EVENT_VALUE)
-            continue;
-          v->value = wheel;
+        if (v->type == EV_REL) {
+          switch (v->code) {
+          case REL_X:
+            if (x == NONE_EVENT_VALUE)
+              continue;
+            v->value = x;
+            break;
+          case REL_Y:
+            if (y == NONE_EVENT_VALUE)
+              continue;
+            v->value = y;
+            break;
+          case REL_WHEEL:
+            if (wheel == NONE_EVENT_VALUE)
+              continue;
+            v->value = wheel;
+            break;
+          }
+        } else if (v == v_syn && (v_x != NULL || v_y != NULL || v_wheel != NULL)) {
+          continue;
         }
         if (end != v)
           *end = *v;
         end++;
       }
-      return end - vals;
+      out_count = end - vals;
+      /* Apply new values to raw queued dev->vals, filtering out zeroed values */
+      for (v = dev->vals; v != dev->vals + dev->num_vals; v++) {
+        if (v->type == EV_REL) {
+          switch (v->code) {
+          case REL_X:
+            if (x == NONE_EVENT_VALUE)
+              continue;
+            v->value = x;
+            break;
+          case REL_Y:
+            if (y == NONE_EVENT_VALUE)
+              continue;
+            v->value = y;
+            break;
+          case REL_WHEEL:
+            if (wheel == NONE_EVENT_VALUE)
+              continue;
+            v->value = wheel;
+            break;
+          }
+        }
+        if (end != v)
+          *end = *v;
+        end++;
+      }
+      dev->num_vals = end - dev->vals;
+      if (v_syn != NULL)
+        input_inject_event(handle, EV_SYN, SYN_REPORT, 1);
     }
   }
 
-  /* Otherwise return events unchanged */
-  return count;
+  return out_count;
 }
 
 static bool usb_mouse_match(struct input_handler *handler, struct input_dev *dev) {
