@@ -68,25 +68,30 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
         if (v_x != NULL && v == v_x) {
           if (x == NONE_EVENT_VALUE)
             continue;
+          printk("LEETMOUSE: update x");
           v->value = x;
         } else if (v_y != NULL && v == v_y) {
           if (y == NONE_EVENT_VALUE)
             continue;
+          printk("LEETMOUSE: update y");
           v->value = y;
         } else if (v_wheel != NULL && v == v_wheel) {
           if (wheel == NONE_EVENT_VALUE)
             continue;
+          printk("LEETMOUSE: update wheel");
           v->value = wheel;
         }
         if (end != v)
           *end = *v;
         end++;
       }
+      printk("LEETMOUSE: updated values");
       return end - vals;
     }
   }
 
   /* Otherwise return events unchanged */
+  printk("LEETMOUSE: skip updating");
   return count;
 }
 
