@@ -64,6 +64,7 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
     if (!accelerate(&x, &y, &wheel)) {
       /* If successful, apply new values to events, filtering out zeroed values */
       for (v = vals; v != vals + count; v++) {
+        /* TODO: REL_X, REL_Y, and REL_WHEEL not matching v_* pointer should be omitted or updated */
         if (v_x != NULL && v == v_x) {
           if (x == NONE_EVENT_VALUE)
             continue;
