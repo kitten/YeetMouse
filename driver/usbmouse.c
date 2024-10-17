@@ -25,6 +25,7 @@
 #define NONE_EVENT_VALUE 0
 
 static unsigned int usb_mouse_events(struct input_handle *handle, struct input_value *vals, unsigned int count) {
+  struct input_dev *dev = handle->dev;
   unsigned int out_count = count;
   struct input_value *end = vals;
   struct input_value *v;
@@ -90,6 +91,34 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
         end++;
       }
       out_count = end - vals;
+      /* Apply new values to the queued (raw) events, same as above.
+       * NOTE: This might (strictly speaking) not be necessary, but this way we leave
+       * no trace of the unmodified values, in case another subsystem uses them. */
+      for (v = dev->vals; v != dev->vals + dev->num_vals; v++) {
+        if (v->type == EV_REL) {
+          switch (v->code) {
+          case REL_X:
+            if (x == NONE_EVENT_VALUE)
+              continue;
+            v->value = x;
+            break;
+          case REL_Y:
+            if (y == NONE_EVENT_VALUE)
+              continue;
+            v->value = y;
+            break;
+          case REL_WHEEL:
+            if (wheel == NONE_EVENT_VALUE)
+              continue;
+            v->value = wheel;
+            break;
+          }
+        }
+        if (end != v)
+          *end = *v;
+        end++;
+      }
+      dev->num_vals = end - dev->vals;
     }
   }
 
