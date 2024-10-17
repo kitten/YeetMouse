@@ -23,48 +23,6 @@
 #define DRIVER_DESC "USB HID mouse driver with acceleration (LEETMOUSE)"
 
 #define NONE_EVENT_VALUE 0
-static int relative_axis_events[REL_CNT] = {
-  /* [x, y, ..., wheel, ...] */ NONE_EVENT_VALUE
-};
-
-struct input_dev *virtual_input_dev;
-
-// The virtual_input_dev is declared for/in the maccel_input_handler module.
-// This initializes it.
-static int create_virtual_device(void) {
-  int error;
-
-  virtual_input_dev = input_allocate_device();
-  if (!virtual_input_dev) {
-    printk(KERN_ERR "Failed to allocate virtual input device\n");
-    return -ENOMEM;
-  }
-
-  virtual_input_dev->name = "Yeetmouse";
-  virtual_input_dev->id.bustype = BUS_USB;
-  virtual_input_dev->id.version = 1;
-
-  // Set the supported event types and codes for the virtual device
-  // and for some reason not setting some EV_KEY bits causes a noticeable
-  // difference in the values we operate on, leading to a different
-  // acceleration behavior than we expect.
-  set_bit(EV_KEY, virtual_input_dev->evbit);
-  set_bit(BTN_LEFT, virtual_input_dev->keybit);
-
-  set_bit(EV_REL, virtual_input_dev->evbit);
-  for (u32 code = REL_X; code < REL_CNT; code++) {
-    set_bit(code, virtual_input_dev->relbit);
-  }
-
-  error = input_register_device(virtual_input_dev);
-  if (error) {
-    printk(KERN_ERR "LEETMOUSE: Failed to register virtual input device\n");
-    input_free_device(virtual_input_dev);
-    return error;
-  }
-
-  return 0;
-}
 
 static unsigned int usb_mouse_events(struct input_handle *handle, struct input_value *vals, unsigned int count) {
   struct input_handler *handler = handle->handler;
@@ -137,7 +95,7 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
 }
 
 static bool usb_mouse_match(struct input_handler *handler, struct input_dev *dev) {
-  if (dev == virtual_input_dev || !dev->dev.parent)
+  if (!dev->dev.parent)
     return false;
   struct hid_device *hdev = to_hid_device(dev->dev.parent);
   printk("LEETMOUSE: found a possible mouse %s", hdev->name);
@@ -202,17 +160,11 @@ struct input_handler usb_mouse_handler = {
 };
 
 static int __init usb_mouse_init(void) {
-  int error = create_virtual_device();
-  if (error) {
-    return error;
-  }
   return input_register_handler(&usb_mouse_handler);
 }
 
 static void __exit usb_mouse_exit(void) {
   input_unregister_handler(&usb_mouse_handler);
-  input_unregister_device(virtual_input_dev);
-  input_free_device(virtual_input_dev);
 }
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
