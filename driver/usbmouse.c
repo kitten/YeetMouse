@@ -34,7 +34,7 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
 
   /* Find input_value for EV_REL events we're interested in and store pointers */
   for (v = vals; v != vals + count; v++) {
-    if (v->type != ENV_REL)
+    if (v->type != EV_REL)
       continue;
     switch (v->code) {
     case REL_X:
