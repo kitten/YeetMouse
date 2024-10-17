@@ -25,9 +25,7 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
 
   /* Find input_value for EV_REL events we're interested in and store pointers */
   for (v = vals; v != vals + count; v++) {
-    if (v->type == EV_SYN && v->code == SYN_REPORT) {
-      v_syn = v;
-    } else if (v->type == EV_REL) {
+    if (v->type == EV_REL) {
       switch (v->code) {
       case REL_X:
         v_x = v;
@@ -75,15 +73,15 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
             v->value = wheel;
             break;
           }
-        } else if (v == v_syn && (v_x != NULL || v_y != NULL || v_wheel != NULL)) {
-          continue;
         }
         if (end != v)
           *end = *v;
         end++;
       }
       out_count = end - vals;
-      /* Apply new values to raw queued dev->vals, filtering out zeroed values */
+      /* Apply new values to the queued (raw) events, same as above.
+       * NOTE: This might (strictly speaking) not be necessary, but this way we leave
+       * no trace of the unmodified values, in case another subsystem uses them. */
       for (v = dev->vals; v != dev->vals + dev->num_vals; v++) {
         if (v->type == EV_REL) {
           switch (v->code) {
@@ -109,8 +107,6 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
         end++;
       }
       dev->num_vals = end - dev->vals;
-      if (v_syn != NULL)
-        input_inject_event(handle, EV_SYN, SYN_REPORT, 1);
     }
   }
 
@@ -125,6 +121,21 @@ static bool usb_mouse_match(struct input_handler *handler, struct input_dev *dev
   return hdev->type == HID_TYPE_USBMOUSE;
 }
 
+/* Same as Linux's input_register_handle but we always add the handle to the head of handlers */
+int usb_mouse_register_handle_head(struct input_handle *handle) {
+  struct input_handler *handler = handle->handler;
+  struct input_dev *dev = handle->dev;
+  int error = mutex_lock_interruptible(&dev->mutex);
+  if (error)
+    return error;
+  list_add_rcu(&handle->d_node, &dev->h_list);
+  mutex_unlock(&dev->mutex);
+  list_add_tail_rcu(&handle->h_node, &handler->h_list);
+  if (handler->start)
+    handler->start(handle);
+  return 0;
+}
+
 static int usb_mouse_connect(struct input_handler *handler, struct input_dev *dev, const struct input_device_id *id) {
   struct input_handle *handle;
   int error;
@@ -137,7 +148,7 @@ static int usb_mouse_connect(struct input_handler *handler, struct input_dev *de
   handle->handler = handler;
   handle->name = "leetmouse";
 
-  error = input_register_handle(handle);
+  error = usb_mouse_register_handle_head(handle);
   if (error)
     goto err_free_mem;
 
