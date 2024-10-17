@@ -73,7 +73,10 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
       case REL_WHEEL:
         v_wheel = v;
         break;
-      } /* TODO: What if we get duplicate events before a SYN? */
+      }
+      /* TODO: What if we get duplicate events before a SYN?
+       * It should, in theory, be possible to protect ourselves from this.
+       * However, since `accelerate` is stateful, that's currently not a good idea. */
     }
   }
 
@@ -134,7 +137,7 @@ static int usb_mouse_connect(struct input_handler *handler, struct input_dev *de
 
   handle->dev = input_get_device(dev);
   handle->handler = handler;
-  handle->name = "leetmouse";
+  handle->name = "yeetmouse";
 
   /* WARN: Instead of `input_register_handle` we use a customized version of it here.
    * This prepends the handler (like a filter) instead of appending it, making
@@ -147,7 +150,7 @@ static int usb_mouse_connect(struct input_handler *handler, struct input_dev *de
   if (error)
     goto err_unregister_handle;
 
-  printk(pr_fmt("LEETMOUSE: connecting to device: %s (%s at %s)"), dev_name(&dev->dev), dev->name ?: "unknown", dev->phys ?: "unknown");
+  printk(pr_fmt("yeetmouse: connecting to device: %s (%s at %s)"), dev_name(&dev->dev), dev->name ?: "unknown", dev->phys ?: "unknown");
 
   return 0;
 
@@ -176,7 +179,7 @@ static const struct input_device_id usb_mouse_ids[] = {
 MODULE_DEVICE_TABLE(input, usb_mouse_ids);
 
 struct input_handler usb_mouse_handler = {
-  .name = "leetmouse",
+  .name = "yeetmouse",
   .id_table = usb_mouse_ids,
   .events = usb_mouse_events,
   .connect = usb_mouse_connect,
