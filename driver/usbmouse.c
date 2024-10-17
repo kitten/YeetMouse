@@ -25,7 +25,6 @@
 #define NONE_EVENT_VALUE 0
 
 static unsigned int usb_mouse_events(struct input_handle *handle, struct input_value *vals, unsigned int count) {
-  struct input_handler *handler = handle->handler;
   struct input_value *end = vals;
   struct input_value *v;
 
@@ -65,22 +64,18 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
     if (!accelerate(&x, &y, &wheel)) {
       /* If successful, apply new values to events, filtering out zeroed values */
       for (v = vals; v != vals + count; v++) {
-        switch (v) {
-        case v_x:
+        if (v_x != NULL && v == v_x) {
           if (x == NONE_EVENT_VALUE)
             continue;
           v->value = x;
-          break;
-        case v_y:
+        } else if (v_y != NULL && v == v_y) {
           if (y == NONE_EVENT_VALUE)
             continue;
           v->value = y;
-          break;
-        case v_wheel:
+        } else if (v_wheel != NULL && v == v_wheel) {
           if (wheel == NONE_EVENT_VALUE)
             continue;
           v->value = wheel;
-          break;
         }
         if (end != v)
           *end = *v;
