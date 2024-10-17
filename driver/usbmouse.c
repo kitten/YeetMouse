@@ -52,6 +52,7 @@ struct usb_mouse {
     struct urb *irq;
 
     signed char *data;
+    u8 poll_interval;
 };
 
 /* See: https://github.com/torvalds/linux/blob/c964ced7726294d40913f2127c3f185a92cb4a41/drivers/hid/usbhid/usbmouse.c#L49-L86 */
@@ -164,6 +165,7 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
     if (!input_dev)
         goto fail2;
 
+    mouse->poll_interval = endpoint->bInterval;
     mouse->irq = irq;
     mouse->usbdev = dev;
     mouse->dev = input_dev;
