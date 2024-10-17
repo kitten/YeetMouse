@@ -66,53 +66,74 @@ static int create_virtual_device(void) {
   return 0;
 }
 
-static bool usb_mouse_filter(struct input_handle *handle, u32 type, u32 code, int value) {
-  switch (type) {
-    case EV_REL: {
-      printk("LEETMOUSE: EV_REL => code %d, value %d", code, value);
-      relative_axis_events[code] = value;
-      return true; // skip unaccelerated mouse input.
-    }
-    case EV_SYN: {
-      int x = relative_axis_events[REL_X];
-      int y = relative_axis_events[REL_Y];
-      int wheel = relative_axis_events[REL_WHEEL];
-      if (x || y || wheel) {
-        printk("LEETMOUSE: EV_SYN => code %d", code);
+static unsigned int usb_mouse_events(struct input_handle *handle, struct input_value *vals, unsigned int count) {
+  struct input_handler *handler = handle->handler;
+  struct input_value *end = vals;
+  struct input_value *v;
 
-        if (!accelerate(&x, &y, &wheel)) {
-          if (x) {
-            input_report_rel(virtual_input_dev, REL_X, x);
-          }
-          if (y) {
-            input_report_rel(virtual_input_dev, REL_Y, y);
-          }
-          if (wheel) {
-            input_report_rel(virtual_input_dev, REL_WHEEL, wheel);
-          }
-        }
+  struct input_value *v_x = NULL;
+  struct input_value *v_y = NULL;
+  struct input_value *v_wheel = NULL;
 
-        relative_axis_events[REL_X] = NONE_EVENT_VALUE;
-        relative_axis_events[REL_Y] = NONE_EVENT_VALUE;
-        relative_axis_events[REL_WHEEL] = NONE_EVENT_VALUE;
-      }
-
-      for (u32 code = REL_Z; code < REL_CNT; code++) {
-        int value = relative_axis_events[code];
-        if (value != NONE_EVENT_VALUE) {
-          input_report_rel(virtual_input_dev, code, value);
-          relative_axis_events[code] = NONE_EVENT_VALUE;
-        }
-      }
-
-      input_sync(virtual_input_dev);
-
-      return false;
-    }
-
-    default:
-      return false;
+  /* Find input_value for EV_REL events we're interested in and store pointers */
+  for (v = vals; v != vals + count; v++) {
+    if (v->type != ENV_REL)
+      continue;
+    switch (v->code) {
+    case REL_X:
+      v_x = v;
+      break;
+    case REL_Y:
+      v_y = v;
+      break;
+    case REL_WHEEL:
+      v_wheel = v;
+      break;
+    } /* TODO: What if we get duplicate events before a SYN? */
   }
+
+  if (v_x != NULL || v_y != NULL || v_wheel != NULL) {
+    /* Retrieve values if any EV_REL events were found */
+    int x = NONE_EVENT_VALUE;
+    int y = NONE_EVENT_VALUE;
+    int wheel = NONE_EVENT_VALUE;
+    if (v_x != NULL)
+      x = v_x->value;
+    if (v_y != NULL)
+      y = v_y->value;
+    if (v_wheel != NULL)
+      wheel = v_wheel->value;
+    /* Attempt to apply acceleration */
+    if (!accelerate(&x, &y, &wheel)) {
+      /* If successful, apply new values to events, filtering out zeroed values */
+      for (v = vals; v != vals + count; v++) {
+        switch (v) {
+        case v_x:
+          if (x == NONE_EVENT_VALUE)
+            continue;
+          v->value = x;
+          break;
+        case v_y:
+          if (y == NONE_EVENT_VALUE)
+            continue;
+          v->value = y;
+          break;
+        case v_wheel:
+          if (wheel == NONE_EVENT_VALUE)
+            continue;
+          v->value = wheel;
+          break;
+        }
+        if (end != v)
+          *end = *v;
+        end++;
+      }
+      return end - vals;
+    }
+  }
+
+  /* Otherwise return events unchanged */
+  return count;
 }
 
 static bool usb_mouse_match(struct input_handler *handler, struct input_dev *dev) {
@@ -174,7 +195,7 @@ MODULE_DEVICE_TABLE(input, usb_mouse_ids);
 struct input_handler usb_mouse_handler = {
   .name = "leetmouse",
   .id_table = usb_mouse_ids,
-  .filter = usb_mouse_filter,
+  .events = usb_mouse_events,
   .connect = usb_mouse_connect,
   .disconnect = usb_mouse_disconnect,
   .match = usb_mouse_match
