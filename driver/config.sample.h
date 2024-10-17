@@ -1,6 +1,6 @@
 // Maximum number of packets allowed to be sent from the mouse at once. Linux's default value is 8, which at
 // least causes EOVERFLOW for my mouse (SteelSeries Rival 600). Increase this, if 'dmesg -w' tells you to!
-#define BUFFER_SIZE 16
+#define BUFFER_SIZE 8
 
 #define FP64_ONE 4294967296ll
 #define FP64_SHIFT 32
