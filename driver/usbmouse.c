@@ -25,6 +25,8 @@
 #define NONE_EVENT_VALUE 0
 
 static unsigned int usb_mouse_events(struct input_handle *handle, struct input_value *vals, unsigned int count) {
+  struct input_dev *dev = handle->dev;
+  unsigned int out_count = count;
   struct input_value *end = vals;
   struct input_value *v;
 
@@ -62,37 +64,62 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
       wheel = v_wheel->value;
     /* Attempt to apply acceleration */
     if (!accelerate(&x, &y, &wheel)) {
-      /* If successful, apply new values to events, filtering out zeroed values */
+      /* Apply new values to events, filtering out zeroed values */
       for (v = vals; v != vals + count; v++) {
-        /* TODO: REL_X, REL_Y, and REL_WHEEL not matching v_* pointer should be omitted or updated */
-        if (v_x != NULL && v == v_x) {
-          if (x == NONE_EVENT_VALUE)
-            continue;
-          printk("LEETMOUSE: update x");
-          v->value = x;
-        } else if (v_y != NULL && v == v_y) {
-          if (y == NONE_EVENT_VALUE)
-            continue;
-          printk("LEETMOUSE: update y");
-          v->value = y;
-        } else if (v_wheel != NULL && v == v_wheel) {
-          if (wheel == NONE_EVENT_VALUE)
-            continue;
-          printk("LEETMOUSE: update wheel");
-          v->value = wheel;
+        if (v->type == EV_REL) {
+          switch (v->code) {
+          case REL_X:
+            if (x == NONE_EVENT_VALUE)
+              continue;
+            v->value = x;
+            break;
+          case REL_Y:
+            if (y == NONE_EVENT_VALUE)
+              continue;
+            v->value = y;
+            break;
+          case REL_WHEEL:
+            if (wheel == NONE_EVENT_VALUE)
+              continue;
+            v->value = wheel;
+            break;
+          }
         }
         if (end != v)
           *end = *v;
         end++;
       }
-      printk("LEETMOUSE: updated values");
-      return end - vals;
+      out_count = end - vals;
+      /* Apply new values to raw queued dev->vals, filtering out zeroed values */
+      for (v = dev->vals; v != dev->vals + dev->num_vals; v++) {
+        if (v->type == EV_REL) {
+          switch (v->code) {
+          case REL_X:
+            if (x == NONE_EVENT_VALUE)
+              continue;
+            v->value = x;
+            break;
+          case REL_Y:
+            if (y == NONE_EVENT_VALUE)
+              continue;
+            v->value = y;
+            break;
+          case REL_WHEEL:
+            if (wheel == NONE_EVENT_VALUE)
+              continue;
+            v->value = wheel;
+            break;
+          }
+        }
+        if (end != v)
+          *end = *v;
+        end++;
+      }
+      dev->num_vals = end - dev->vals;
     }
   }
 
-  /* Otherwise return events unchanged */
-  printk("LEETMOUSE: skip updating");
-  return count;
+  return out_count;
 }
 
 static bool usb_mouse_match(struct input_handler *handler, struct input_dev *dev) {
@@ -123,9 +150,11 @@ static int usb_mouse_connect(struct input_handler *handler, struct input_dev *de
   if (error)
     goto err_unregister_handle;
 
-  error = input_grab_device(handle);
+  /* TODO: We can't grab the device here, but we'd like our handle to be "first"
+   * Can we manually execute other handles from within ours? */
+  /*error = input_grab_device(handle);
   if (error)
-    goto err_unregister_handle;
+    goto err_unregister_handle;*/
 
   printk(pr_fmt("LEETMOUSE: connecting to device: %s (%s at %s)"), dev_name(&dev->dev), dev->name ?: "unknown", dev->phys ?: "unknown");
 
@@ -140,7 +169,7 @@ err_free_mem:
 }
 
 static void usb_mouse_disconnect(struct input_handle *handle) {
-  input_release_device(handle);
+  /*input_release_device(handle);*/
   input_close_device(handle);
   input_unregister_handle(handle);
   kfree(handle);
