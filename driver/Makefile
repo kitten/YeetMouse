@@ -1,5 +1,5 @@
 obj-m += leetmouse.o
-leetmouse-objs := accel.o usbmouse.o util.o
+leetmouse-objs := accel.o usbmouse.o
 
 # Detect architecture
 ARCH := $(shell uname -m)

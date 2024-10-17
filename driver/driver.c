@@ -73,7 +73,10 @@ static unsigned int driver_events(struct input_handle *handle, struct input_valu
       case REL_WHEEL:
         v_wheel = v;
         break;
-      } /* TODO: What if we get duplicate events before a SYN? */
+      }
+      /* TODO: What if we get duplicate events before a SYN?
+       * It should, in theory, be possible to protect ourselves from this.
+       * However, since `accelerate` is stateful, that's currently not a good idea. */
     }
   }
 
@@ -147,7 +150,7 @@ static int driver_connect(struct input_handler *handler, struct input_dev *dev, 
   if (error)
     goto err_unregister_handle;
 
-  printk(pr_fmt("Yeetmouse: connecting to device: %s (%s at %s)"), dev_name(&dev->dev), dev->name ?: "unknown", dev->phys ?: "unknown");
+  printk(pr_fmt("yeetmouse: connecting to device: %s (%s at %s)"), dev_name(&dev->dev), dev->name ?: "unknown", dev->phys ?: "unknown");
 
   return 0;
 
