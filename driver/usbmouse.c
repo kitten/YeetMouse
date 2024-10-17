@@ -169,12 +169,12 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
     unsigned int n = 0;
     size_t offset = offsetof(struct hid_descriptor, desc);
 
+    // NOTE: Added check to prevent Keyboard issues
     if(strstr(dev->product, "Keyboard")) { // This caused issues with keyboard media buttons / volume roller
         printk("Probed product is a kb, not a mouse! (%s)\n", dev->product);
         return 1;
     }
 
-    //Leetmouse Mod END
     interface = intf->cur_altsetting;
 
     if (interface->desc.bNumEndpoints != 1)
@@ -196,7 +196,7 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
     if (!mouse || !input_dev)
         goto fail1;
     
-    mouse->data = usb_alloc_coherent(dev, BUFFER_SIZE, GFP_KERNEL, &mouse->data_dma); //Leetmouse Mod
+    mouse->data = usb_alloc_coherent(dev, BUFFER_SIZE, GFP_KERNEL, &mouse->data_dma);
     if (!mouse->data)
         goto fail1;
 
@@ -300,13 +300,13 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
     input_dev->close = usb_mouse_close;
 
     usb_fill_int_urb(mouse->irq, dev, pipe, mouse->data,
-             (maxp > BUFFER_SIZE ? BUFFER_SIZE : maxp),         //Leetmouse Mod
+             (maxp > BUFFER_SIZE ? BUFFER_SIZE : maxp),
              usb_mouse_irq, mouse, endpoint->bInterval);
     mouse->irq->transfer_dma = mouse->data_dma;
     mouse->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
-    error = input_register_device(mouse->dev);                    //Leetmouse Mod
-    if (error)                                                    //Leetmouse Mod
+    error = input_register_device(mouse->dev);
+    if (error)
         goto fail3;
 
     usb_set_intfdata(intf, mouse);
@@ -315,13 +315,13 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 fail3:    
     usb_free_urb(mouse->irq);
 fail2:    
-    usb_free_coherent(dev, BUFFER_SIZE, mouse->data, mouse->data_dma); //Leetmouse Mod
+    usb_free_coherent(dev, BUFFER_SIZE, mouse->data, mouse->data_dma);
 fail1_5:
-    kfree(mouse->data_pos);
+    kfree(mouse->data_pos); // NOTE: Free custom `data_pos`
 fail1:    
     input_free_device(input_dev);
     kfree(mouse);
-    return error;                                                 //Leetmouse Mod
+    return error;
 }
 
 static void usb_mouse_disconnect(struct usb_interface *intf)
