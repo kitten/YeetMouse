@@ -62,6 +62,7 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
   struct input_value *v_syn = NULL;
   struct input_value *end = vals;
   struct input_value *v;
+  int error;
 
   for (v = vals; v != vals + count; v++) {
     if (v->type == EV_REL) {
@@ -80,6 +81,7 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
     } else if (v->type == EV_SYN && v->code == SYN_REPORT) {
       /* If we find an EV_SYN event, we store the pointer and apply acceleration next */
       v_syn = v;
+      break;
     }
   }
 
@@ -88,16 +90,38 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
     int x = state->x;
     int y = state->y;
     int wheel = state->wheel;
-    if (!accelerate(&x, &y, &wheel)) {
+    /* If we found no values to update, return */
+    if (x == NONE_EVENT_VALUE && y == NONE_EVENT_VALUE && wheel == NONE_EVENT_VALUE)
+      return out_count;
+    error = accelerate(&x, &y, &wheel);
+    /* Reset state */
+    state->x = NONE_EVENT_VALUE;
+    state->y = NONE_EVENT_VALUE;
+    state->wheel = NONE_EVENT_VALUE;
+    /* Deal with left over EV_REL events we should take into account for the next run */
+    for (v = v_syn; v != vals + count; v++) {
+      if (v->type == EV_REL) {
+        /* Store values for next runthrough */
+        switch (v->code) {
+        case REL_X:
+          state->x = v->value;
+          break;
+        case REL_Y:
+          state->y = v->value;
+          break;
+        case REL_WHEEL:
+          state->wheel = v->value;
+          break;
+        }
+      }
+    }
+    /* Apply updates after we've captured events for next run */
+    if (!error) {
       out_count = usb_mouse_update_events(vals, count, x, y, wheel);
       /* Apply new values to the queued (raw) events, same as above.
        * NOTE: This might (strictly speaking) not be necessary, but this way we leave
        * no trace of the unmodified values, in case another subsystem uses them. */
       dev->num_vals = usb_mouse_update_events(dev->vals, dev->num_vals, x, y, wheel);
-      /* Reset state */
-      state->x = NONE_EVENT_VALUE;
-      state->y = NONE_EVENT_VALUE;
-      state->wheel = NONE_EVENT_VALUE;
     }
   }
 
@@ -133,6 +157,7 @@ int usb_mouse_register_handle_head(struct input_handle *handle) {
 
 static int usb_mouse_connect(struct input_handler *handler, struct input_dev *dev, const struct input_device_id *id) {
   struct input_handle *handle;
+  struct usb_mouse_state *state;
   int error;
 
   handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
