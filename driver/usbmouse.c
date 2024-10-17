@@ -33,22 +33,25 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
   struct input_value *v_x = NULL;
   struct input_value *v_y = NULL;
   struct input_value *v_wheel = NULL;
+  struct input_value *v_syn = NULL;
 
   /* Find input_value for EV_REL events we're interested in and store pointers */
   for (v = vals; v != vals + count; v++) {
-    if (v->type != EV_REL)
-      continue;
-    switch (v->code) {
-    case REL_X:
-      v_x = v;
-      break;
-    case REL_Y:
-      v_y = v;
-      break;
-    case REL_WHEEL:
-      v_wheel = v;
-      break;
-    } /* TODO: What if we get duplicate events before a SYN? */
+    if (v->type == EV_SYN && v->code == SYN_REPORT) {
+      v_syn = v;
+    } else if (v->type == EV_REL) {
+      switch (v->code) {
+      case REL_X:
+        v_x = v;
+        break;
+      case REL_Y:
+        v_y = v;
+        break;
+      case REL_WHEEL:
+        v_wheel = v;
+        break;
+      } /* TODO: What if we get duplicate events before a SYN? */
+    }
   }
 
   if (v_x != NULL || v_y != NULL || v_wheel != NULL) {
@@ -84,6 +87,8 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
             v->value = wheel;
             break;
           }
+        } else if (v == v_syn && (v_x != NULL || v_y != NULL || v_wheel != NULL)) {
+          continue;
         }
         if (end != v)
           *end = *v;
@@ -116,6 +121,8 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
         end++;
       }
       dev->num_vals = end - dev->vals;
+      if (v_syn != NULL)
+        input_inject_event(handle, EV_SYN, SYN_REPORT, 1);
     }
   }
 
