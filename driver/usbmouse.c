@@ -24,6 +24,43 @@
 
 #define NONE_EVENT_VALUE 0
 
+/* Applies new values to events, filtering out zeroed values */
+INLINE unsigned int usb_mouse_update_events(
+  struct input_value* vals,
+  unsigned int count,
+  int x,
+  int y,
+  int wheel
+) {
+  struct input_value *end = vals;
+  struct input_value *v;
+  for (v = vals; v != vals + count; v++) {
+    if (v->type == EV_REL) {
+      switch (v->code) {
+      case REL_X:
+        if (x == NONE_EVENT_VALUE)
+          continue;
+        v->value = x;
+        break;
+      case REL_Y:
+        if (y == NONE_EVENT_VALUE)
+          continue;
+        v->value = y;
+        break;
+      case REL_WHEEL:
+        if (wheel == NONE_EVENT_VALUE)
+          continue;
+        v->value = wheel;
+        break;
+      }
+    }
+    if (end != v)
+      *end = *v;
+    end++;
+  }
+  return end - vals;
+}
+
 static unsigned int usb_mouse_events(struct input_handle *handle, struct input_value *vals, unsigned int count) {
   struct input_dev *dev = handle->dev;
   unsigned int out_count = count;
@@ -65,60 +102,11 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
       wheel = v_wheel->value;
     /* Attempt to apply acceleration */
     if (!accelerate(&x, &y, &wheel)) {
-      /* Apply new values to events, filtering out zeroed values */
-      for (v = vals; v != vals + count; v++) {
-        if (v->type == EV_REL) {
-          switch (v->code) {
-          case REL_X:
-            if (x == NONE_EVENT_VALUE)
-              continue;
-            v->value = x;
-            break;
-          case REL_Y:
-            if (y == NONE_EVENT_VALUE)
-              continue;
-            v->value = y;
-            break;
-          case REL_WHEEL:
-            if (wheel == NONE_EVENT_VALUE)
-              continue;
-            v->value = wheel;
-            break;
-          }
-        }
-        if (end != v)
-          *end = *v;
-        end++;
-      }
-      out_count = end - vals;
+      out_count = usb_mouse_update_events(vals, count, x, y, wheel);
       /* Apply new values to the queued (raw) events, same as above.
        * NOTE: This might (strictly speaking) not be necessary, but this way we leave
        * no trace of the unmodified values, in case another subsystem uses them. */
-      for (v = dev->vals; v != dev->vals + dev->num_vals; v++) {
-        if (v->type == EV_REL) {
-          switch (v->code) {
-          case REL_X:
-            if (x == NONE_EVENT_VALUE)
-              continue;
-            v->value = x;
-            break;
-          case REL_Y:
-            if (y == NONE_EVENT_VALUE)
-              continue;
-            v->value = y;
-            break;
-          case REL_WHEEL:
-            if (wheel == NONE_EVENT_VALUE)
-              continue;
-            v->value = wheel;
-            break;
-          }
-        }
-        if (end != v)
-          *end = *v;
-        end++;
-      }
-      dev->num_vals = end - dev->vals;
+      dev->num_vals = usb_mouse_update_events(dev->vals, dev->num_vals, x, y, wheel);
     }
   }
 
@@ -160,6 +148,9 @@ static int usb_mouse_connect(struct input_handler *handler, struct input_dev *de
   handle->handler = handler;
   handle->name = "leetmouse";
 
+  /* WARN: Instead of `input_register_handle` we use a customized version of it here.
+   * This prepends the handler (like a filter) instead of appending it, making
+   * it take precedence over any other input handler that'll be added. */
   error = usb_mouse_register_handle_head(handle);
   if (error)
     goto err_free_mem;
