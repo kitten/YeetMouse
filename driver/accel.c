@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "accel.h"
-#include "util.h"
 #include "config.h"
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -13,6 +12,8 @@ MODULE_AUTHOR("Christopher Williams <chilliams (at) gmail (dot) com>"); //Origin
 MODULE_AUTHOR("Klaus Zipfel <klaus (at) zipfel (dot) family>");         //Current maintainer
 MODULE_AUTHOR("Maciej Grzęda <gmaciejg525 (at) gmail (dot) com>");      // Current maintainer
 // Sorry if you have issues with compilation because of this silly character in my family name lol <3
+
+#define INLINE __attribute__((always_inline)) inline
 
 #define MAX_LUT_ARRAY_SIZE 128
 #define MAX_LUT_BUF_LEN 4096

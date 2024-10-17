@@ -12,11 +12,8 @@
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
-                                                                //Leetmouse Mod BEGIN
 #include "accel.h"
 #include "config.h"
-#include "util.h"
-                                                                //Leetmouse Mod END
 
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -26,19 +23,12 @@
 #include <linux/hid.h>
 #include <linux/version.h>
 
-/* for apple IDs */
-/*                                                              //Leetmouse Mod BEGIN
-#ifdef CONFIG_USB_HID_MODULE
-#include "../hid-ids.h"
-#endif
-*/                                                              //Leetmouse Mod END
-
 /*
  * Version Information
  */
 #define DRIVER_VERSION "v1.6"
 #define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@ucw.cz>"
-#define DRIVER_DESC "USB HID mouse driver with acceleration (LEETMOUSE)"   //Leetmouse Mod
+#define DRIVER_DESC "USB HID mouse driver with acceleration (LEETMOUSE)"
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
