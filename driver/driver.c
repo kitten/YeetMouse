@@ -78,8 +78,11 @@ static unsigned int driver_events(struct input_handle *handle, struct input_valu
         state->wheel = v->value;
         break;
       }
-    } else if (v->type == EV_SYN && v->code == SYN_REPORT) {
-      /* If we find an EV_SYN event, we store the pointer and apply acceleration next */
+    } else if (
+      (state->x != NONE_EVENT_VALUE || state->y != NONE_EVENT_VALUE) &&
+        v->type == EV_SYN && v->code == SYN_REPORT
+    ) {
+      /* If we find an EV_SYN event, and we've seen x/y values, we store the pointer and apply acceleration next */
       v_syn = v;
       break;
     }
