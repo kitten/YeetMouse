@@ -12,50 +12,23 @@
 
 #define NONE_EVENT_VALUE 0
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0))
+  #define __cleanup_events 0
+#else
+  #define __cleanup_events 1
+#endif
+
 struct usb_mouse_state {
   int x;
   int y;
   int wheel;
 };
 
-/* Applies new values to events, filtering out zeroed values */
-INLINE unsigned int usb_mouse_update_events(
-  struct input_value* vals,
-  unsigned int count,
-  int x,
-  int y,
-  int wheel
-) {
-  struct input_value *end = vals;
-  struct input_value *v;
-  for (v = vals; v != vals + count; v++) {
-    if (v->type == EV_REL) {
-      switch (v->code) {
-      case REL_X:
-        if (x == NONE_EVENT_VALUE)
-          continue;
-        v->value = x;
-        break;
-      case REL_Y:
-        if (y == NONE_EVENT_VALUE)
-          continue;
-        v->value = y;
-        break;
-      case REL_WHEEL:
-        if (wheel == NONE_EVENT_VALUE)
-          continue;
-        v->value = wheel;
-        break;
-      }
-    }
-    if (end != v)
-      *end = *v;
-    end++;
-  }
-  return end - vals;
-}
-
-static unsigned int usb_mouse_events(struct input_handle *handle, struct input_value *vals, unsigned int count) {
+#if __cleanup_events
+  static unsigned int usb_mouse_events(struct input_handle *handle, struct input_value *vals, unsigned int count) {
+#else
+  static void usb_mouse_events(struct input_handle *handle, const struct input_value *vals, unsigned int count) {
+#endif
   struct usb_mouse_state *state = handle->private;
   struct input_dev *dev = handle->dev;
   unsigned int out_count = count;
@@ -95,7 +68,7 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
     int wheel = state->wheel;
     /* If we found no values to update, return */
     if (x == NONE_EVENT_VALUE && y == NONE_EVENT_VALUE && wheel == NONE_EVENT_VALUE)
-      return out_count;
+      goto unchanged_return;
     error = accelerate(&x, &y, &wheel);
     /* Reset state */
     state->x = NONE_EVENT_VALUE;
@@ -120,19 +93,69 @@ static unsigned int usb_mouse_events(struct input_handle *handle, struct input_v
     }
     /* Apply updates after we've captured events for next run */
     if (!error) {
-      out_count = usb_mouse_update_events(vals, count, x, y, wheel);
+      for (v = vals; v != vals + count; v++) {
+        if (v->type == EV_REL) {
+          switch (v->code) {
+          case REL_X:
+            if (__cleanup_events && x == NONE_EVENT_VALUE)
+              continue;
+            v->value = x;
+            break;
+          case REL_Y:
+            if (__cleanup_events && y == NONE_EVENT_VALUE)
+              continue;
+            v->value = y;
+            break;
+          case REL_WHEEL:
+            if (__cleanup_events && wheel == NONE_EVENT_VALUE)
+              continue;
+            v->value = wheel;
+            break;
+          }
+        }
+        if (end != v)
+          *end = *v;
+        end++;
+      }
+      out_count = end - vals;
       /* Apply new values to the queued (raw) events, same as above.
        * NOTE: This might (strictly speaking) not be necessary, but this way we leave
        * no trace of the unmodified values, in case another subsystem uses them. */
-      dev->num_vals = usb_mouse_update_events(dev->vals, dev->num_vals, x, y, wheel);
+      for (v = vals; v != vals + count; v++) {
+        if (v->type == EV_REL) {
+          switch (v->code) {
+          case REL_X:
+            if (x == NONE_EVENT_VALUE)
+              continue;
+            v->value = x;
+            break;
+          case REL_Y:
+            if (y == NONE_EVENT_VALUE)
+              continue;
+            v->value = y;
+            break;
+          case REL_WHEEL:
+            if (wheel == NONE_EVENT_VALUE)
+              continue;
+            v->value = wheel;
+            break;
+          }
+        }
+        if (end != v)
+          *end = *v;
+        end++;
+      }
+      dev->num_vals = end - vals;
     }
   }
-
   /* NOTE: Technically, we can also stop iterating over `vals` when we find EV_SYN, apply acceleration,
    * then restart in a loop until we reach the end of `vals` to handle multiple EV_SYN events per batch.
    * However, that's not necessary since we can assume that all events in `vals` apply to the same moment
    * in time. */
+unchanged_return:
+#if __cleanup_events
   return out_count;
+#endif
 }
 
 static bool usb_mouse_match(struct input_handler *handler, struct input_dev *dev) {
