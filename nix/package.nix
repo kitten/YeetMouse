@@ -33,7 +33,8 @@ let
       pkgs.glfw3
     ];
 
-    makeFlags = kernel.makeFlags ++ [
+    makeFlags = kernel.commonMakeFlags ++ [
+      "KBUILD_OUTPUT=${kernel.dev}/lib/modules/${kernel.modDirVersion}/build"
       "-C"
       "${kernel.dev}/lib/modules/${kernel.modDirVersion}/build"
       "M=$(sourceRoot)/driver"
