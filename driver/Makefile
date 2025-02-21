@@ -1,5 +1,5 @@
 obj-m += leetmouse.o
-leetmouse-objs := accel.o usbmouse.o
+leetmouse-objs := accel.o driver.o
 
 # Detect architecture
 ARCH := $(shell uname -m)
