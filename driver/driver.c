@@ -33,22 +33,22 @@ struct mouse_state {
   struct input_dev *dev = handle->dev;
   unsigned int out_count = count;
   struct input_value *v_syn = NULL;
-  struct input_value *end = vals;
+  struct input_value *end = (struct input_value*) vals;
   struct input_value *v;
   int error;
 
-  for (v = vals; v != vals + count; v++) {
+  for (v = (struct input_value*) vals; v != vals + count; v++) {
     if (v->type == EV_REL) {
       /* Find input_value for EV_REL events we're interested in and store values */
       switch (v->code) {
       case REL_X:
-        state->x = v->value;
+        state->x = (int) v->value;
         break;
       case REL_Y:
-        state->y = v->value;
+        state->y = (int) v->value;
         break;
       case REL_WHEEL:
-        state->wheel = v->value;
+        state->wheel = (int) v->value;
         break;
       }
     } else if (
@@ -93,7 +93,7 @@ struct mouse_state {
     }
     /* Apply updates after we've captured events for next run */
     if (!error) {
-      for (v = vals; v != vals + count; v++) {
+      for (v = (struct input_value*) vals; v != vals + count; v++) {
         if (v->type == EV_REL) {
           switch (v->code) {
           case REL_X:
@@ -121,7 +121,7 @@ struct mouse_state {
       /* Apply new values to the queued (raw) events, same as above.
        * NOTE: This might (strictly speaking) not be necessary, but this way we leave
        * no trace of the unmodified values, in case another subsystem uses them. */
-      for (v = vals; v != vals + count; v++) {
+      for (v = (struct input_value*) vals; v != vals + count; v++) {
         if (v->type == EV_REL) {
           switch (v->code) {
           case REL_X:
