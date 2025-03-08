@@ -12,7 +12,6 @@ let
   parameterBasePath = "/sys/module/yeetmouse/parameters";
 
   rotationType = types.submodule {
-    description = "Adjusts for mouse rotational input and optionally applies an angle to snap to";
     options = {
       angle = mkOption {
         type = floatRange (-180.0) 180.0;
@@ -38,107 +37,196 @@ let
   };
 
   modesType = types.attrTag {
-    linear = types.submodule {
+    linear = mkOption {
       description = ''
         Simplest acceleration mode. Accelerates at a constant rate by multiplying acceleration.
         See [RawAccel: Linear](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#linear)
       '';
-      options = {
-        acceleration = mkOption {
-          type = floatRange 0.0005 1.0;
-          default = 0.15;
-          description = "Linear acceleration multiplier";
+      type = types.submodule {
+        options = {
+          acceleration = mkOption {
+            type = floatRange 0.0005 1.0;
+            default = 0.15;
+            description = "Linear acceleration multiplier";
+          };
         };
       };
+      apply = params: [
+        {
+          value = "1";
+          param = "AccelerationMode";
+        }
+        {
+          value = toString params.acceleration;
+          param = "Acceleration";
+        }
+      ];
     };
-    power = types.submodule {
+
+    power = mkOption {
       description = ''
         Acceleration mode based on an exponent and multiplier as found in Source Engine games.
         See [RawAccel: Power](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#power)
       '';
-      options = {
-        acceleration = mkOption {
-          type = floatRange 0.0005 5.0;
-          default = 0.15;
-          description = "Power acceleration pre-multiplier";
-        };
-        exponent = mkOption {
-          type = floatRange 0.0005 1.0;
-          default = 0.2;
-          description = "Power acceleration exponent";
+      type = types.submodule {
+        options = {
+          acceleration = mkOption {
+            type = floatRange 0.0005 5.0;
+            default = 0.15;
+            description = "Power acceleration pre-multiplier";
+          };
+          exponent = mkOption {
+            type = floatRange 0.0005 1.0;
+            default = 0.2;
+            description = "Power acceleration exponent";
+          };
         };
       };
+      apply = params: [
+        {
+          value = "2";
+          param = "AccelerationMode";
+        }
+        {
+          value = toString params.acceleration;
+          param = "Acceleration";
+        }
+        {
+          value = toString params.exponent;
+          param = "Exponent";
+        }
+      ];
     };
-    classic = types.submodule {
+
+    classic = mkOption {
       description = ''
         Acceleration mode based on an exponent and multiplier as found in Quake 3.
         See [RawAccel: Classic](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#power)
       '';
-      options = {
-        acceleration = mkOption {
-          type = floatRange 0.0005 5.0;
-          default = 0.15;
-          apply = toString;
-          description = "Classic acceleration pre-multiplier";
-        };
-        exponent = mkOption {
-          type = floatRange 2.0 5.0;
-          default = 2.0;
-          apply = toString;
-          description = "Classic acceleration exponent";
+      type = types.submodule {
+        options = {
+          acceleration = mkOption {
+            type = floatRange 0.0005 5.0;
+            default = 0.15;
+            apply = toString;
+            description = "Classic acceleration pre-multiplier";
+          };
+          exponent = mkOption {
+            type = floatRange 2.0 5.0;
+            default = 2.0;
+            apply = toString;
+            description = "Classic acceleration exponent";
+          };
         };
       };
+      apply = params: [
+        {
+          value = "3";
+          param = "AccelerationMode";
+        }
+        {
+          value = toString params.classic.acceleration;
+          param = "Acceleration";
+        }
+        {
+          value = toString params.classic.exponent;
+          param = "Exponent";
+        }
+      ];
     };
-    motivity = types.submodule {
+
+    motivity = mkOption {
       description = ''
         Acceleration mode based on a sigmoid function with a set mid-point.
         See [RawAccel: Motivity](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#motivity)
       '';
-      options = {
-        acceleration = mkOption {
-          type = floatRange 0.01 10.0;
-          default = 0.15;
-          apply = toString;
-          description = "Motivity acceleration dividend";
-        };
-        start = mkOption {
-          type = floatRange 0.1 50.0;
-          default = 10.0;
-          apply = toString;
-          description = "Motivity acceleration mid-point";
+      type = types.submodule {
+        options = {
+          acceleration = mkOption {
+            type = floatRange 0.01 10.0;
+            default = 0.15;
+            apply = toString;
+            description = "Motivity acceleration dividend";
+          };
+          start = mkOption {
+            type = floatRange 0.1 50.0;
+            default = 10.0;
+            apply = toString;
+            description = "Motivity acceleration mid-point";
+          };
         };
       };
+      apply = params: [
+        {
+          value = "4";
+          param = "AccelerationMode";
+        }
+        {
+          value = toString params.acceleration;
+          param = "Acceleration";
+        }
+        {
+          value = toString params.start;
+          param = "Midpoint";
+        }
+      ];
     };
-    jump = types.submodule {
+
+    jump = mkOption {
       description = ''
         Acceleration mode applying gain above a mid-point.
         Optionally, the transition mid-point can be smoothened and a smoothness may be applied to the whole sigmoid function.
         See [RawAccel: Jump](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#jump)
       '';
-      options = {
-        acceleration = mkOption {
-          type = floatRange 0.01 10.0;
-          default = 0.15;
-          description = "Jump acceleration dividend";
-        };
-        midpoint = mkOption {
-          type = floatRange 0.1 50.0;
-          default = 0.15;
-          description = "Jump acceleration mid-point";
-        };
-        smoothness = mkOption {
-          type = floatRange 0.01 1.0;
-          default = 0.2;
-          description = "Jump curve smoothness (smoothness of the applied output curve)";
-        };
-        useSmoothing = mkOption {
-          type = types.bool;
-          default = true;
-          description = "Enable Jump smoothing (whether the transition mid-point is smoothed out into the gain curve";
-          apply = x: if x then "1" else "0";
+      type = types.submodule {
+        options = {
+          acceleration = mkOption {
+            type = floatRange 0.01 10.0;
+            default = 0.15;
+            description = "Jump acceleration dividend";
+          };
+          midpoint = mkOption {
+            type = floatRange 0.1 50.0;
+            default = 0.15;
+            description = "Jump acceleration mid-point";
+          };
+          smoothness = mkOption {
+            type = floatRange 0.01 1.0;
+            default = 0.2;
+            description = "Jump curve smoothness (smoothness of the applied output curve)";
+          };
+          useSmoothing = mkOption {
+            type = types.bool;
+            default = true;
+            description = "Enable Jump smoothing (whether the transition mid-point is smoothed out into the gain curve";
+            apply = x: if x then "1" else "0";
+          };
         };
       };
+      apply = params: [
+        {
+          value = "5";
+          param = "AccelerationMode";
+        }
+        {
+          value = toString params.acceleration;
+          param = "Acceleration";
+        }
+        {
+          value = toString params.midpoint;
+          param = "Midpoint";
+        }
+        {
+          value = toString params.smoothness;
+          param = "Exponent";
+        }
+        {
+          value = params.useSmoothing;
+          param = "UseSmoothing";
+        }
+      ];
     };
+
     lut = let
       tuple = ts: mkOptionType {
         name = "tuple";
@@ -150,20 +238,36 @@ let
         ((floatRange 0.0 100.0) // { description = "Input speed (x)"; })
         ((floatRange 0.0 100.0) // { description = "Output speed ratio (y)"; })
       ];
-    in types.submodule {
+    in mkOption {
       description = ''
         Acceleration mode following a custom curve.
         The curve is specified using individual `[x, y]` points.
         See [RawAccel: Lookup Table](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#look-up-table)
       '';
-      options = {
-        data = mkOption {
-          type = types.listOf lutVec;
-          default = [];
-          apply = ls: map (t: "${toString t[0]},${toString t[1]}") ls;
-          description = "Lookup Table data (a list of `[x, y]` points)";
+      type = types.submodule {
+        options = {
+          data = mkOption {
+            type = types.listOf lutVec;
+            default = [];
+            apply = ls: map (t: "${toString t[0]},${toString t[1]}") ls;
+            description = "Lookup Table data (a list of `[x, y]` points)";
+          };
         };
       };
+      apply = params: [
+        {
+          value = "6";
+          param = "AccelerationMode";
+        }
+        {
+          value = concatStringsSep ";" params.lut.data;
+          param = "LutDataBuf";
+        }
+        {
+          value = length params.lut.data;
+          param = "LutSize";
+        }
+      ];
     };
   };
 
@@ -276,94 +380,12 @@ in {
       };
       description = "Acceleration mode to apply and their parameters";
       apply = params: []
-        ++ (optionals (params ? linear) [
-          {
-            value = "1";
-            param = "AccelerationMode";
-          }
-          {
-            value = toString params.linear.acceleration;
-            param = "Acceleration";
-          }
-        ])
-        ++ (optionals (params ? power) [
-          {
-            value = "2";
-            param = "AccelerationMode";
-          }
-          {
-            value = toString params.power.acceleration;
-            param = "Acceleration";
-          }
-          {
-            value = toString params.power.exponent;
-            param = "Exponent";
-          }
-        ])
-        ++ (optionals (params ? classic) [
-          {
-            value = "3";
-            param = "AccelerationMode";
-          }
-          {
-            value = toString params.classic.acceleration;
-            param = "Acceleration";
-          }
-          {
-            value = toString params.classic.exponent;
-            param = "Exponent";
-          }
-        ])
-        ++ (optionals (params ? motivity) [
-          {
-            value = "4";
-            param = "AccelerationMode";
-          }
-          {
-            value = toString params.motivity.acceleration;
-            param = "Acceleration";
-          }
-          {
-            value = toString params.motivity.start;
-            param = "Midpoint";
-          }
-        ])
-        ++ (optionals (params ? jump) [
-          {
-            value = "5";
-            param = "AccelerationMode";
-          }
-          {
-            value = toString params.jump.acceleration;
-            param = "Acceleration";
-          }
-          {
-            value = toString params.jump.midpoint;
-            param = "Midpoint";
-          }
-          {
-            value = toString params.jump.smoothness;
-            param = "Exponent";
-          }
-          {
-            value = params.jump.useSmoothing;
-            param = "UseSmoothing";
-          }
-        ])
-        ++ (optionals (params ? lut) [
-          {
-            value = "6";
-            param = "AccelerationMode";
-          }
-          {
-            value = concatStringsSep ";" params.lut.data;
-            param = "LutDataBuf";
-          }
-          {
-            value = length params.lut.data;
-            param = "LutSize";
-          }
-        ]);
+        ++ (optionals (params ? linear) params.linear)
+        ++ (optionals (params ? power) params.power)
+        ++ (optionals (params ? classic) params.classic)
+        ++ (optionals (params ? motivity) params.motivity)
+        ++ (optionals (params ? jump) params.jump)
+        ++ (optionals (params ? lut) params.lut);
     };
   };
 
