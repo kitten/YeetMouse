@@ -6,7 +6,8 @@ let
   cfg = config.hardware.yeetmouse;
 
   degToRad = x: x * 0.017453292;
-  floatRange = lower: upper: addCheck types.float (x: x >= lower && x <= upper);
+  floatRange = lower: upper: types.addCheck types.float (x: x >= lower && x <= upper);
+      apply = x: if x != null then x else 0.0;
 
   parameterBasePath = "/sys/module/yeetmouse/parameters";
 
@@ -14,7 +15,7 @@ let
     description = "Adjusts for mouse rotational input and optionally applies an angle to snap to";
     options = {
       angle = mkOption {
-        type = floatRange -180.0 180.0;
+        type = floatRange (-180.0) 180.0;
         default = 0.0;
         apply = degToRad;
         description = "Rotation adjustment to apply to mouse inputs (in degrees)";
@@ -63,7 +64,7 @@ let
         };
         exponent = mkOption {
           type = floatRange 0.0005 1.0;
-          default = 0.15;
+          default = 0.2;
           description = "Power acceleration exponent";
         };
       };
@@ -102,7 +103,7 @@ let
         };
         start = mkOption {
           type = floatRange 0.1 50.0;
-          default = 0.15;
+          default = 10.0;
           apply = toString;
           description = "Motivity acceleration mid-point";
         };
@@ -146,8 +147,8 @@ let
         description = "tuple of" + concatMapStrings (t: " (${t.description})") ts;
       };
       lutVec = tuple [
-        ((floatRange 0.0 100.0) // { description = "Input speed (x)" })
-        ((floatRange 0.0 100.0) // { description = "Output speed ratio (y)" })
+        ((floatRange 0.0 100.0) // { description = "Input speed (x)"; })
+        ((floatRange 0.0 100.0) // { description = "Output speed ratio (y)"; })
       ];
     in types.submodule {
       description = ''
@@ -193,25 +194,24 @@ in {
         };
       };
     in mkOption {
-      type = either sensitivityValue anisotropyValue;
+      type = types.either sensitivityValue anisotropyValue;
       default = 1.0;
       description = "Mouse base sensitivity";
       apply = sens: [
         {
-          value = if isAttrs sens then toString sens.x else sens;
+          value = if isAttrs sens then toString sens.x else toString sens;
           param = "Sensitivity";
         }
         {
-          value = if isAttrs sens then toString sens.y else sens;
+          value = if isAttrs sens then toString sens.y else toString sens;
           param = "SensitivityY";
         }
       ];
     };
 
     inputCap = mkOption {
-      type = nullOr (floatRange 0.0 200.0);
+      type = types.nullOr (floatRange 0.0 200.0);
       default = null;
-      apply = x: if x != null then x else 0.0;
       description = "Limit the maximum pointer speed before applying acceleration";
       apply = x: {
         value = if x != null then toString x else "0";
@@ -220,9 +220,8 @@ in {
     };
 
     outputCap = mkOption {
-      type = nullOr (floatRange 0.0 100.0);
+      type = types.nullOr (floatRange 0.0 100.0);
       default = null;
-      apply = x: if x != null then x else 0.0;
       description = "Cap maximum sensitivity.";
       apply = x: {
         value = if x != null then toString x else "0";
@@ -231,7 +230,7 @@ in {
     };
 
     offset = mkOption {
-      type = nullOr (floatRange -50.0 50.0);
+      type = types.nullOr (floatRange (-50.0) 50.0);
       default = 0.0;
       description = "Acceleration curve offset";
       apply = x: {
