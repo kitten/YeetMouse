@@ -90,19 +90,19 @@ let
   };
 in {
   options.hardware.yeetmouse = {
-    enable = lib.mkOption {
-      type = lib.types.bool;
+    enable = mkOption {
+      type = types.bool;
       default = false;
       description = "Enable yeetmouse kernel module to add configurable mouse acceleration";
     };
 
-    parameters = lib.mkOption {
+    parameters = mkOption {
       type = parametersType;
       default = { };
     };
   };
 
-  config = lib.mkIf cfg.enable {
+  config = mkIf cfg.enable {
     nixpkgs.overlays = [ yeetmouseOverlay ];
 
     boot.extraModulePackages = [ yeetmouse ];
