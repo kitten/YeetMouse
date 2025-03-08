@@ -11,67 +11,76 @@ let
     (lists.findFirstIndex
       (value: modeValue == value) 0 accelerationModeValues) + 1;
 
-  parametersType = types.submodule {
+  parametersType = let
+    degToRad = 0.017453292;
+    floatRange = lower: upper: addCheck types.float (x: x >= lower && x <= upper);
+  in types.submodule {
     options = {
       AccelerationMode = mkOption {
         type = types.enum accelerationModeValues;
         default = "linear";
+        apply = x: toString (modeValueToInt x);
         description = "Sets the algorithm to be used for acceleration";
       };
       InputCap = mkOption {
-        type = types.float;
-        default = 0.0;
-        description = "Limit the maximum pointer speed before applying acceleration.";
+        type = nullOr (floatRange 0.0 200.0);
+        default = null;
+        apply = x: if x != null then toString x else "0";
+        description = "Limit the maximum pointer speed before applying acceleration";
       };
       Sensitivity = mkOption {
-        type = types.float;
+        type = floatRange 0.01 10.0;
         default = 1.0;
-        description = "Mouse base sensitivity.";
+        apply = toString;
+        description = "Mouse base sensitivity";
       };
       Acceleration = mkOption {
         type = types.float;
-        default = 1.0;
-        description = "Mouse acceleration sensitivity.";
+        default = floatRange 0.01 10.0; # NOTE: Differs between modes
+        apply = toString;
+        description = "Acceleration";
       };
       OutputCap = mkOption {
-        type = types.float;
-        default = 0.0;
+        type = nullOr (floatRange 0.0 100.0);
+        default = null;
+        apply = x: if x != null then toString x else "0";
         description = "Cap maximum sensitivity.";
       };
       Offset = mkOption {
-        type = types.float;
+        type = nullOr (floatRange -50.0 50.0);
         default = 0.0;
-        description = "Mouse base sensitivity.";
+        apply = toString;
+        description = "Acceleration curve offset";
       };
       Exponent = mkOption {
-        type = types.float;
-        default = 1.0;
+        type = floatRange 0.01 1.0;
+        default = 0.2;
+        apply = toString;
         description = "Exponent for algorithms that use it";
       };
       Midpoint = mkOption {
-        type = types.float;
+        type = floatRange 0.05 50.0;
         default = 6.0;
+        apply = toString;
         description = "Midpoint for sigmoid function";
       };
       PreScale = mkOption {
-        type = types.float;
+        type = floatRange 0.01 10.0;
         default = 1.0;
-        description = "Parameter to adjust for the DPI";
+        apply = toString;
+        description = "Parameter to adjust for DPI";
       };
       RotationAngle = mkOption {
-        type = types.float;
+        type = floatRange -180.0 180.0;
         default = 0.0;
-        description = "Amount of clockwise rotation (in radians)";
+        apply = x: toString (x * deg2Rad);
+        description = "Amount of clockwise rotation (in degrees)";
       };
       UseSmoothing = mkOption {
         type = types.bool;
         default = true;
-        description = "Whether to smooth out functions (doesn't apply to all)";
-      };
-      ScrollsPerTick = mkOption {
-        type = types.int;
-        default = true;
-        description = "Amount of lines to scroll per scroll-wheel tick.";
+        apply = x: if x then "1" else "0";
+        description = "Whether to smooth out functions (only applies to Jump acceleration)";
       };
     };
   };
@@ -102,18 +111,17 @@ in {
       extraRules = let
         echo = "${pkgs.coreutils}/bin/echo";
         yeetmouseConfig = with cfg.parameters; pkgs.writeShellScriptBin "yeetmouseConfig" ''
-          ${echo} "${toString Acceleration}" > /sys/module/yeetmouse/parameters/Acceleration
-          ${echo} "${toString Exponent}" > /sys/module/yeetmouse/parameters/Exponent
-          ${echo} "${toString InputCap}" > /sys/module/yeetmouse/parameters/InputCap
-          ${echo} "${toString Midpoint}" > /sys/module/yeetmouse/parameters/Midpoint
-          ${echo} "${toString Offset}" > /sys/module/yeetmouse/parameters/Offset
-          ${echo} "${toString OutputCap}" > /sys/module/yeetmouse/parameters/OutputCap
-          ${echo} "${toString PreScale}" > /sys/module/yeetmouse/parameters/PreScale
-          ${echo} "${toString RotationAngle}" > /sys/module/yeetmouse/parameters/RotationAngle
-          ${echo} "${toString Sensitivity}" > /sys/module/yeetmouse/parameters/Sensitivity
-          ${echo} "${toString ScrollsPerTick}" > /sys/module/yeetmouse/parameters/ScrollsPerTick
-          ${echo} "${toString (modeValueToInt AccelerationMode)}" > /sys/module/yeetmouse/parameters/AccelerationMode
-          ${echo} "${if UseSmoothing then "1" else "0"}" > /sys/module/yeetmouse/parameters/UseSmoothing
+          ${echo} "${Acceleration}" > /sys/module/yeetmouse/parameters/Acceleration
+          ${echo} "${Exponent}" > /sys/module/yeetmouse/parameters/Exponent
+          ${echo} "${InputCap}" > /sys/module/yeetmouse/parameters/InputCap
+          ${echo} "${Midpoint}" > /sys/module/yeetmouse/parameters/Midpoint
+          ${echo} "${Offset}" > /sys/module/yeetmouse/parameters/Offset
+          ${echo} "${OutputCap}" > /sys/module/yeetmouse/parameters/OutputCap
+          ${echo} "${PreScale}" > /sys/module/yeetmouse/parameters/PreScale
+          ${echo} "${RotationAngle}" > /sys/module/yeetmouse/parameters/RotationAngle
+          ${echo} "${Sensitivity}" > /sys/module/yeetmouse/parameters/Sensitivity
+          ${echo} "${AccelerationMode}" > /sys/module/yeetmouse/parameters/AccelerationMode
+          ${echo} "${UseSmoothing}" > /sys/module/yeetmouse/parameters/UseSmoothing
           ${echo} "1" > /sys/module/yeetmouse/parameters/update
         '';
       in ''
