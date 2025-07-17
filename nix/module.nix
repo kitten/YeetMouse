@@ -175,10 +175,6 @@ let
           param = "Acceleration";
         }
         {
-          value = toString params.exponent;
-          param = "Limit";
-        }
-        {
           value = toString params.start;
           param = "Midpoint";
         }
@@ -238,7 +234,6 @@ let
         }
       ];
     };
-
 
     jump = mkOption {
       description = ''
