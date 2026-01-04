@@ -476,7 +476,6 @@ in {
     sensitivity = let
       sensitivityValue = floatRange 0.01 10.0;
       anisotropyValue = types.submodule {
-        description = "Anisotropic sensitivity, separating X and Y movement";
         options = {
           x = mkOption {
             type = sensitivityValue;
@@ -484,9 +483,12 @@ in {
           };
           y = mkOption {
             type = sensitivityValue;
-            description = "Vertical sensitivity";
+            default = 1.0;
+            description = "Vertical sensitivity relative to horizontal";
           };
         };
+      } // {
+        description = "Anisotropic sensitivity, separating X and Y movement";
       };
     in mkOption {
       type = types.either sensitivityValue anisotropyValue;
@@ -498,7 +500,7 @@ in {
           param = "Sensitivity";
         }
         {
-          value = if isAttrs sens then toString sens.y else toString sens;
+          value = if isAttrs sens then toString sens.y else toString 1.0;
           param = "SensitivityY";
         }
       ];
